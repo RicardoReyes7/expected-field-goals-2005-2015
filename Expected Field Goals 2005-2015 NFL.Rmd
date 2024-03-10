@@ -1,11 +1,3 @@
-
----
-title: "Ricardo Reyes: RSM 384 Homework 1 -- Due Oct 11"
-output: pdf_document
-Author: Ricardo Reyes
----
-
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 options(warn=-1)
