@@ -1,0 +1,215 @@
+
+---
+title: "Ricardo Reyes: RSM 384 Homework 1 -- Due Oct 11"
+output: pdf_document
+Author: Ricardo Reyes
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(warn=-1)
+library(dplyr)
+library(ggplot2)
+```
+
+Get the data:
+
+```{r}
+library(RCurl)
+url <- getURL("https://raw.githubusercontent.com/statsbylopez/StatsSports/master/Data/nfl_fg.csv")
+nfl.kick <- read.csv(text = url)
+```
+
+## Step 1: Derivation of Expected (Field) Goals
+
+###### My linear weights analytic is obtained by estimation below:
+
+```{r}
+fit <- glm(Success ~ Distance + ScoreDiff + Grass + GameMinute, data = nfl.kick, family = "binomial")
+summary(fit)
+
+```
+
+**Intercept**: In logistic regression, the intercept represents the log odds of success when all independent variables are zero. In this case, it is the probability of a successful kick when all other factors (Distance, ScoreDiff, Grass, GameMinute) are at their reference levels and held constant. It could represent the skill level or consistency of the kicker. To get a numerical interpretation of the coefficient, we can use the equation 1/1 + e^(-5.8158522). This gives us 0.997, which means when all independent variables are at their reference levels and held constant, the estimated probability of a made field goal is 99.7%.
+
+**Distance**: For each unit increase in Distance(assuming a unit is one yard), the log-odds of success decrease by approximately 0.1072732. This implies that the further away from the goalposts the football is, the likelihood of a successful kick decreases. This is intuitive, as longer kicks are inherently more challenging. 
+
+**ScoreDiff**: The coefficient for ScoreDiff represents the change in log odds of success for a one-unit change in ScoreDiff. A ScoreDiff coefficient close to zero suggests that, in this model, the difference in score doesn't significantly impact the likelihood of a successful kick. This might imply that the psychological pressure of the game situation may not be a major factor in making a kick.
+
+**GrassTRUE**: If the field is grass (as opposed to some other surface such as turf or dirt), the log odds of success decrease by 0.1681191. This suggests that, on average, kickers may face more challenges when kicking on grass fields compared to other surfaces like turf. It could be due to factors like surface conditions affecting a kicker's ability to plant their foot securely.
+
+**GameMinute**: The coefficient for GameMinute represents the change in the log-odds of success for a minute change in GameMinute. This coefficient is close to 0 and not statistically significant, therefore it's fair to say the game minute does not affect the likelihood of a successful kick.
+
+**Fitted Values and Residuals**: In logistic regression, fitted values are the predicted probabilities of success for each kick based on the independent variables in the model(Distance, ScoreDiff, GrassTRUE, GameMinute). They represent the estimated likelihood of success for each kick. In logistic regression, residuals are the differences between the observed outcomes (0 for misses, 1 for makes) and the predicted probabilities of success. They quantify how far off the model's predictions are from the actual outcomes.
+
+  In the context of field goal kicking, the fitted values and residuals represent the difference between a kicker's skill and the   element of chance or "luck". It acknowledges that while skill and technique are extremely important in a kicker's ability to     make a field goal, there will always be an element of unpredictability that can affect the outcome of a field goal attempt.
+
+  Philosophically, this highlights the reality that even the most skilled kickers may experience unexpected outcomes due to        factors beyond them. It acknowledges the unpredictability that exists in sports, which adds an element of excitement,            challenge, and opportunity for both success and learning.
+
+  This balance between skill and luck is a fundamental aspect of sports, and statistical models like logistic regression aim to    quantify and understand this complex interplay. Coaches and teams can use these insights to make informed decisions, optimize    strategies, and support their players in achieving their best possible performance.
+
+## Step 2: Evaluation of Points Above Average
+
+###### Calculating the value above average by comparing actual makes to the predicted makes from Step 1:
+
+```{r}
+nfl.kick <- nfl.kick %>% 
+  mutate(expectedmakes = fitted(fit))
+nfl.kick <- nfl.kick %>% 
+  mutate(extramakes = Success-expectedmakes)
+```
+
+###### Creating a histogram to represent this data:
+
+```{r}
+ggplot(nfl.kick, aes(extramakes)) + 
+  geom_histogram(binwidth = 0.07)
+```
+This histogram provides an overview of the distribution of 'extramakes', which signifies field goals made above the average prediction. A positive value indicates a successful kick that was not anticipated, while a negative value indicates a predicted make that did not occur. The concentration of data points around 0 suggests that the majority of kicks were accurately predicted. Notably, there's a leftward skew in the distribution, indicating a significant proportion of kicks that were projected to succeed but did not, contributing to a negative skew in the data. This implies that it is relatively more common to witness an unexpectedly missed easy kick than a surprisingly successful challenging one.
+
+
+###### Creating a scatter plot with a trend line to represent our logistic regression with Distance as the main variable:
+
+```{r}
+ggplot(nfl.kick, aes(x = Distance, y = extramakes, colour = Success)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) + 
+  labs(x = "Distance", y = "Extra Makes")
+
+```
+
+###### Creating a scatter plot with a trend line to represent our logistic regression with Grass as the main variable:
+
+```{r}
+ggplot(nfl.kick, aes(x = Distance, y = extramakes, colour = Grass)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) + 
+  labs(x = "Distance", y = "Extra Makes")
+
+```
+  
+
+###### Correlation Analysis by Distance:
+```{r}
+cor_distance_extramakes <- cor(nfl.kick$extramakes, nfl.kick$Distance)
+
+cat("Correlation between Value Above Average and Distance:", cor_distance_extramakes)
+
+```
+###### Correlation Analysis by Significant Variable (e.g., Grass):
+```{r}
+cor_grass_extramakes <- cor(nfl.kick$extramakes, nfl.kick$Grass)
+
+cat("Correlation between Value Above Average and Grass:", cor_grass_extramakes)
+
+```
+
+## Step 3: Identification of Top Performers
+
+###### Aggregating the points above average for each kicker on both an overall and per-kick basis:
+```{r}
+KickerExpectation <- nfl.kick %>%
+    group_by(Kicker) %>%
+    summarize(Total = sum(extramakes),numkicks=n(),extramakesperkick=Total/numkicks)
+KickerExpectation <- KickerExpectation %>% select(Kicker, Total, extramakesperkick)
+KickerExpectation
+```
+###### Representing the data using a histogram:
+```{r}
+# Histogram for Total
+ggplot(KickerExpectation, aes(Total)) + 
+  geom_histogram()
+
+#Histogram for Extra Makes per Kick
+ggplot(KickerExpectation, aes(extramakesperkick)) + 
+  geom_histogram()
+
+```
+
+###### Histogram for Total:
+
+The histogram shows the total extra value generated by each player across their kicks, with the bars representing the amount of players falling into each range. The distribution appears centered around zero, suggesting that a majority of players in the league are meeting the model's predictions for successful kicks, thus minimizing discrepancies between actual success and expectations. Towards the right end, it spotlights players who consistently outperform expectations, generating more extra value. On the other hand, the left end highlights players who fall short of successfully making kicks that were projected by the model.
+
+###### Histogram for Extra Makes per Kick:
+
+This histogram showcases the distribution of extra value generated per kick by players. Unlike the previous histogram, this metric is calculated by dividing the total extra value generated across a player's kicks by the total number of kicks that respective player attempted. The bars again indicate the frequency of players in each range. The additional value generated per kick tends to cluster around zero which again explains most players are meeting the model's predictions and making kicks they are supposed to be making, however there is a large left-skew within this data.  This suggests that there are some players who generate relatively smaller additional value per kick when considering their overall performance. However, for players with fewer kick attempts or those who performed below expectations, the extra value generated per kick can be notably large and negative, which accounts for the large negative skew.
+
+##### Top Performers Analysis:
+
+###### Top 5 kickers based on points above average overall:
+```{r}
+top_overall <- KickerExpectation %>%
+  arrange(desc(Total)) %>%
+  head(5)
+select(top_overall, Kicker, Total)
+
+```
+
+###### Top 5 kickers based on a per-kick basis:
+```{r}
+top_per_kick <- KickerExpectation %>%
+  arrange(desc(extramakesperkick)) %>%
+  head(5)
+select(top_per_kick, Kicker, extramakesperkick)
+
+```
+
+###### Top 5 kickers based on long kicks (40+ yards):
+```{r}
+long_kicks <- nfl.kick %>%
+  filter(Distance >= 40)
+
+kicker_summary <- long_kicks %>%
+  group_by(Kicker) %>%
+  summarize(
+    total_extra_made_long_kicks = sum(extramakes),
+    total = n()                       
+  )
+
+kicker_summary <- mutate(kicker_summary, extra_made_long_kicks_per_kick = 
+                           total_extra_made_long_kicks / total)
+
+top_overall_extra_long_made <- kicker_summary %>%
+  arrange(desc(total_extra_made_long_kicks)) %>%
+  head(5)
+
+top_overall_extra_long_made_per_kick <- kicker_summary %>%
+  arrange(desc(extra_made_long_kicks_per_kick)) %>%
+  head(5)
+
+select(top_overall_extra_long_made, Kicker, total_extra_made_long_kicks)
+
+select(top_overall_extra_long_made_per_kick, Kicker, 
+       extra_made_long_kicks_per_kick)
+  
+```
+
+## Step 4: Analysis of Kicker Efficiency
+
+```{r}
+Top_Five <-nfl.kick %>%
+  filter(Kicker %in% c("Bailey", "Tucker", "Bironas", "Dawson", "Carpenter"))
+
+ggplot(Top_Five, aes(x = Distance, y = extramakes, colour = Kicker)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) + 
+  labs(x = "Distance", y = "Extra Makes")
+
+```
+
+```{r}
+ggplot(nfl.kick, aes(x = Distance, y = extramakes, colour = Success)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) + 
+  labs(x = "Distance", y = "Extra Makes") +
+  facet_wrap(~ ifelse(Kicker %in% c("Bailey", "Tucker", "Bironas", "Dawson", 
+                                    "Carpenter"), "Top 5 Kickers", 
+                                    "All Kickers")) +
+  theme_minimal()
+
+```
+
+Upon comparing the performance of the NFL's top five kickers in terms of above-average kicks made to the entirety of the league's kickers, a clear distinction emerges. These five kickers demonstrate significantly higher proficiency in successfully completing above-average kicks compared to the rest of the league. Notably, the trend line for the top five kickers exhibits a steeper positive slope, indicating their superior success rates at greater distances in comparison to the broader group of kickers.
+
+
